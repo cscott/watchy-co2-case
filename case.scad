@@ -139,7 +139,7 @@ module watchy() {
 
 module case_bottom() {
     //color("grey")
-    import("Armadillonium_Bottom.stl", convexity=10);
+    import("Armadillonium_Bottom-4.3mf", convexity=10);
 }
 
 module case_top() {
@@ -154,7 +154,14 @@ module scd40_with_clearance(clearance=0.5) {
             cube([clearance*2, clearance*2, clearance]);
         }
     }
-    // air vents
+}
+
+module screw_holes($fn=24) {
+    d=1.6;
+    translate([watchy_board_width()/2,3,0])
+        for (i=[1,-1]) scale([i,1,1]) for (j=[0,1]) {
+                translate([13,j*40,0]) cylinder(d=d, h=30, center=true);
+                    }
 }
 
 module extra_bump(only_cube=false, only_chamfer=false, extra_chamfer=0) {
@@ -207,6 +214,7 @@ module new_case_bottom() {
             }
         }
         scd40_pcb(clearance=0.75, yclearance=0.5);
+        screw_holes();
     }
 }
 
@@ -234,11 +242,13 @@ module everything(new_parts=true) {
     }
 }
 
-//new_case_bottom();
+new_case_bottom();
 //everything(true);
-new_case_top();
+//new_case_top();
 *scd40();
 *    watchy();
+
+//rotate([180,0,0]) { new_case_bottom(); #screw_holes(); }
 
 /*
 rotate([180,0,0]) translate(-scd_translate()) {
@@ -247,5 +257,3 @@ rotate([180,0,0]) translate(-scd_translate()) {
     #scd40_pcb();
 }
 */
-
-
