@@ -1,11 +1,10 @@
 function watchy_board_width() = 33.8; // XXX check this
-// The thinnest part of the corner is 0 thickness if extra_thick_fudge is
-// -0.044. Al has wall min of 1.0mm (and wire min of 1.5mm)
-function extra_thick_fudge() = -0.044; // add a little extra shelf height
-function shelf_height() = 0.75 + extra_thick_fudge(); // how much space underneath
-function wiring_space() = 1 - extra_thick_fudge(); // how much space we need for the i2c wires
+function shelf_height() = 1.00; // how much space underneath
+function wiring_space() = 0.6; // how much space we need for the i2c wires
+function scd40_vertical_clear() = 0.3; // includes space below pcb
+function scd40_horizontal_clear() = 0.5;
 function air_space() = 1; // how much air space we need above the device
-function grill_thick() = 0.75; // minumum wire thickness on the grill
+function grill_thick() = 1.0; // minimum wire thickness on the grill
 function scd40_offset() = -.5; // this is pretty much all clearance
 function scd_translate() = [
     // for the "only redo the top case" version, the 5.9 here used to be 1.55
@@ -121,25 +120,44 @@ module scd40(with_wiring=false, simplify=false) {
             translate([0,0,0.8+wiring_space()/2-epsilon()])
             cube([10.1,10.1,wiring_space()+2*epsilon()], center=true);
         } else {
-            pcb_thick=0.6;
+            pcb_thick=wiring_space();
             translate([0,0,0.8])
-            #linear_extrude(height=pcb_thick) scd40_pcb_outline();
+            linear_extrude(height=pcb_thick) scd40_pcb_outline();
         }
     }
 }
 
-module scd40_pcb(clearance=0.5, yclearance=0) {
+module scd40_pcb_space(clearance=0.75, yclearance=0.5) {
     big_height = 10;
     big_tab = 10;
     translate(scd_translate()) {
         translate([0,big_tab/2,0.8 - big_height])
-        centercube([10.1 + 2*clearance, 10.1 + 2*yclearance + big_tab, big_height + wiring_space()], x=true, y=true);
+        centercube([10.3 + 2*clearance, 10.3 + 2*yclearance + big_tab, big_height + wiring_space()], x=true, y=true);
     }
 }
 
 module scd40_vent(lid=false) {
     translate(scd_translate()) scale([1,1,-1]) translate([0,0,4.5 + (lid?epsilon():0)]) {
         scd40_vent1(lid=lid);
+    }
+    min_wall_thick = 1.0;
+    cutoff = 5;
+    if (lid) {
+        difference() {
+        minkowski() {
+        translate(scd_translate()) {
+            translate([0,0,-5.5]) linear_extrude(height=5.5, scale=8.5/7.8)
+            square([7.8,7.8], center=true);
+        }
+        cube([
+                 (scd40_horizontal_clear() + min_wall_thick)*2,
+                 (scd40_horizontal_clear() + min_wall_thick)*2,
+                 (scd40_vertical_clear() + min_wall_thick)*2
+        ], center=true);
+        }
+        translate([0,0,-0.6])
+        centercube([100,100,100],x=true,y=true);
+        }
     }
 }
 module scd40_vent2(lid=false) {
@@ -180,13 +198,14 @@ module scd40_vent1(lid=false) {
 }
 
 module watchy() {
-    color("brown")
+    //color("brown")
     import("Watchy_Battery.stl");
 }
 
 module case_bottom() {
     //color("grey")
-    import("Armadillonium_Bottom-4.3mf", convexity=10);
+    //import("Armadillonium_Bottom-4.3mf", convexity=10);
+    import("Armadillonium_Bottom-11.stl", convexity=10);
 }
 
 module case_top() {
@@ -194,21 +213,26 @@ module case_top() {
     import("Armadillonium_Top.stl", convexity=10);
 }
 
-module scd40_with_clearance(clearance=0.5) {
+module scd40_with_clearance() {
+    h = scd40_horizontal_clear();
+    v = scd40_vertical_clear();
     minkowski() {
         scd40(with_wiring=true, simplify=true);
-        translate([-clearance, -clearance, -clearance]) {
-            cube([clearance*2, clearance*2, clearance]);
+        translate([-h, -h, -v]) {
+            cube([h*2, h*2, v]);
         }
     }
 }
 
-module screw_holes($fn=24) {
-    d=1.6;
+module screw_holes(fill_in=false,$fn=24) {
+    extra_diam = 1;
+    extra_height = .005;
+    d=1.6 + (fill_in ? extra_diam : 0);
+    h=10.1 + 2*extra_height;
     translate([watchy_board_width()/2,3,0])
         for (i=[1,-1]) scale([i,1,1]) for (j=[0,1]) {
-                translate([13,j*40,0]) cylinder(d=d, h=30, center=true);
-                    }
+                translate([13,j*40,11.70+extra_height-h+(fill_in?0:-1)]) cylinder(d=d, h=h+(fill_in?0:2));
+            }
 }
 
 module chamroundcube(xyz=[10,10,10],x=false,y=false,z=false,chamfer=chamfer_amount(),hack=0,only_cube=false, only_chamfer=false, round=false) {
@@ -220,9 +244,10 @@ module chamroundcube(xyz=[10,10,10],x=false,y=false,z=false,chamfer=chamfer_amou
 }
 
 module extra_bump(only_cube=false, only_chamfer=false, round=false, round2=false, round3=false, extra_chamfer=0) {
-    ysize=13.65;
-    xsize=12;
-    angle=58.8;
+    ysize=14.05;
+    xsize=14;
+    angle=55.081;
+    fudge=3.3;
     cheat=(round2||round3)?3:0;
     translate([watchy_board_width()/2, scd40_offset(), case_split_offset()-case_top_height()]) {
         if (!round3) difference() {
@@ -236,7 +261,7 @@ module extra_bump(only_cube=false, only_chamfer=false, round=false, round2=false
         for (i=[1,-1]) scale([i,1,1])
         translate([-xsize/2,-ysize/2]) rotate([0,0,angle])
         translate([0,-cheat,0])
-        chamroundcube([max(xsize,ysize),max(xsize,ysize)+cheat-2.2/*fudge*/,case_top_height()+case_bottom_height()], chamfer=chamfer_amount()+extra_chamfer, hack=2, only_cube=only_cube, only_chamfer=only_chamfer, round=round);
+        chamroundcube([max(xsize,ysize),max(xsize,ysize)+cheat-fudge,case_top_height()+case_bottom_height()], chamfer=chamfer_amount()+extra_chamfer, hack=2, only_cube=only_cube, only_chamfer=only_chamfer, round=round);
     }
 }
 
@@ -247,8 +272,12 @@ module new_case_top() {
             case_top();
             scd40_vent(lid=true);
             difference() {
+                // cheat the walls just enough so front is solid
+                hollow(1.21) difference() {
                 extra_bump(only_cube=true);
                 extra_bump(only_chamfer=true);
+                scd40_with_clearance();
+                }
                 translate([watchy_board_width()/2, -.1, -.47])
                      centercube([40,15,10], x=true);
                 translate([watchy_board_width()/2, -.1, -.47])
@@ -262,25 +291,60 @@ module new_case_top() {
     }
 }
 
+module erode(wall_size=1) {
+    minkowski() {
+        difference() {
+            cube([100,100,100],center=true);
+            children();
+        }
+        //sphere(r=wall_size, $fn=16);
+        cube(2*wall_size, center=true);
+    }
+}
+
+module hollow_space(wall_size=1) {
+    difference() {
+        children();
+        erode(wall_size=wall_size) children();
+    }
+}
+
+module hollow(wall_size=1) {
+    intersection() {
+        children();
+        erode(wall_size=wall_size) children();
+    }
+}
+
 module new_case_bottom() {
+    blind_screw_holes=true;
     extra_chamfer=.3;
     difference() {
         union() {
             case_bottom();
+            if (!blind_screw_holes) screw_holes(fill_in=true);
+	    extra=.1;
             difference() {
-                //extra_bump(round=true, extra_chamfer=extra_chamfer);
+                hollow(1+extra) difference() {
                 extra_bump(only_cube=true);
                 extra_bump(only_chamfer=true, extra_chamfer=extra_chamfer, round3=true);
-                translate([watchy_board_width()/2, -.1, -.47])
-                     centercube([40,15,10], x=true);
-                translate([watchy_board_width()/2, -.1, -.47])
+                scd40_pcb_space(clearance=0.75-extra, yclearance=0.5-extra);
+                }
+                translate([watchy_board_width()/2, -.1, -2.47])
+                     centercube([40,15,15], x=true);
+                translate([watchy_board_width()/2, -.1, -2.47])
                 for (i=[1,-1]) scale([i,1,1])
-                translate([13,0,0]) centercube([10, 15, 10], x=true, z=true);
+                translate([13,0,0]) centercube([10, 15, 15], x=true);
+		translate([0,0,0*epsilon()/2])
                 splitplane(top=true);
             }
         }
-        scd40_pcb(clearance=0.75, yclearance=0.5);
-        screw_holes();
+        scd40_pcb_space(clearance=0.75, yclearance=0.5);
+        if (!blind_screw_holes) screw_holes();
+        // extra hollowing out to save material costs
+	wall=1.25;
+	translate([watchy_board_width()/2,23,0])
+        centercube([34-wall*2,36 - wall*2,6.7 - wall], x=true, y=true);
     }
 }
 
@@ -321,7 +385,7 @@ module main(part="everything", with_scd40=false, with_watchy=false) {
         rotate([180,0,0]) translate(-scd_translate()) {
             scd40(with_air=true);
             //scd40_vent();
-            #scd40_pcb();
+            #scd40_pcb_space();
         }
     }
     if (with_scd40) {
@@ -334,6 +398,9 @@ module main(part="everything", with_scd40=false, with_watchy=false) {
 
 //main("bottom", with_scd40=true);
 //main("pcb_outline");
-main("bottom");
+//main("bottom");
 //main();
-scd40();
+//scd40();
+
+main("bottom", with_watchy=false, with_scd40=false);
+*watchy();
