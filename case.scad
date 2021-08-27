@@ -198,12 +198,12 @@ module scd40_vent1(lid=false) {
 }
 
 module watchy() {
-    //color("brown")
+    color("brown")
     import("Watchy_Battery.stl");
 }
 
 module case_bottom() {
-    //color("grey")
+    color("grey")
     //import("Armadillonium_Bottom-4.3mf", convexity=10);
     import("Armadillonium_Bottom-11.stl", convexity=10);
 }
@@ -357,9 +357,13 @@ translate([d/2 - fillet, 0, 0])
 circle(r = fillet);
 }
 
-module everything(new_parts=true) {
-    scd40();
-    watchy();
+module everything(new_parts=true, with_scd40=true, with_watchy=true) {
+    if (with_scd40) {
+        scd40();
+    }
+    if (with_watchy) {
+        watchy();
+    }
     if (new_parts) {
         new_case_bottom();
     } else {
@@ -374,7 +378,8 @@ module everything(new_parts=true) {
 
 module main(part="everything", with_scd40=false, with_watchy=false) {
     if (part=="everything") {
-        everything(true);
+        // We do the scd40 and watchy ourselves below
+        everything(true, with_scd40=false, with_watchy=false);
     } else if (part=="top") {
         new_case_top();
     } else if (part=="bottom") {
@@ -403,4 +408,4 @@ module main(part="everything", with_scd40=false, with_watchy=false) {
 //scd40();
 
 main("bottom", with_watchy=false, with_scd40=false);
-*watchy();
+//watchy();
