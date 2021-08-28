@@ -231,23 +231,3 @@ if True: # can disable this for faster refresh
     show_object(watchy, name='watchy')
 
 #debug(case_bottom.vertices(tag="bottom_screws").circle(screw_boss_radius))
-
-# battery stats
-battery_types = {
-    # type: [zoffset, xoffset, diameter, length]
-    '14500': [-4, -11, 14.2, 53 ], # AA 700-1000mAh
-    '14430': [1, -11, 14.2, 43 ], # 2/3 AA? 400-600mAh
-    '14250': [ 9, -11, 14.2, 25 ], # 1/2 AA 300mAh
-    '10440': [2, -9, 10, 44 ], # AAA 250-350mAh
-    '10280': [10, -9, 10, 28 ], # 2/3 AAA 200mAh
-    '10180': [14, -9, 10, 18 ], # 1/3 AAA 90mAh
-}
-if False:
-    b = '14500'
-    battery_opt = (cq.Workplane("XZ")
-    .workplane(invert=True, offset=battery_types[b][0])
-    .center(battery_types[b][1],-2)
-    .circle(battery_types[b][2]/2)
-    .extrude(battery_types[b][3])
-    )
-    show_object(battery_opt, name=("battery " + b))
