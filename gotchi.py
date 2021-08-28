@@ -130,6 +130,7 @@ lugs = (lugs
 )
 show_object(lugs, name='lugs')
 
+# watchy_pcb_bb: xlen=33.8 ylen=37.96
 case_wall_clear = 0.7
 case_wall_thick = 1.5
 case_depth = watchy_bb.zmax - watchy_pcb_top.z + case_wall_clear
