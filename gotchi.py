@@ -5,6 +5,12 @@ from watchy_sizes import *
 
 watchy_board_width = 33.8
 
+# watchy_pcb_bb: xlen=33.8 ylen=37.96
+case_wall_clear = 0.7
+case_wall_thick = 1.5
+
+top_plate_thick = 1.5
+
 # measurements from gotchi.svg
 screw_separation_w = 41.2
 screw_separation_h = 33.8
@@ -17,18 +23,36 @@ switch_plate_width = 26
 switch_plate_depth = 5 # 4 on the model, but we need more room for switches
 switch_plate_offset = 1
 switch_plate_fillet = 0.75
+switch_spacing = 8.5
+switch_height = 2.5
+switch_proud = 0.5 # probably switch depress is actually 0.3?
+switch_cheat = 0.5 # adjust a little closer to watchy
+switch_pcb_thick = 0.8
+switch_pcb_width = 23
+switch_pcb_height = 4.5
+switch_plate_thick = 1
+switch_pcb_gap = (switch_pcb_thick + switch_height - switch_proud - switch_plate_thick)
+extra_switch_pcb_gap = 5
+
 screen_clearance = 0.5
-top_plate_thick = 1.5
 pcb_support_radius = 2
 m2_tap_diam = 1.6 # XXX
 m2_clear_diam = 2 # XXX
 m2_head_clear_diam = 2.5 # XXX
 m2_head_thick = 1
 mag_support_depth = 5
-mag_angle2 = 35 # top angle
+mag_angle2 = 35 # top angle; smaller is shallower
 mag_angle1 = 20 # bottom angle; 0 is right angle
 bottom_fillet = 1 # should be less than case_wall_thick
 mag_depth_cheat = 0.85
+
+switch_positions = [
+    (-faceplate_height/2 - switch_plate_depth/2 + switch_cheat,
+     i*switch_spacing,
+     -screen_clearance - top_plate_thick + switch_height - switch_proud
+    )
+    for i in [-1,0,1]
+]
 
 # import SCD40 model
 scd40 = cq.importers.importStep('Sensirion_CO2_Sensors_SCD4x_STEP_file.step')
@@ -55,7 +79,7 @@ watchy = (watchy
     .faces("-Z", tag="watchy").faces("<<Z[-3]")
     .tag("watchy_screen")
 )
-#debug(watchy, name="watchy_screen")
+#debug(watchy, "watchy_screen_center")
 watchy_screen_center = watchy.val().Center()
 
 # find the top of the PCB
@@ -63,27 +87,15 @@ watchy = (watchy
     .faces("-Z", tag="watchy").faces("<<Z[-6]")
     .tag("watchy_pcb_top")
 )
-#debug(watchy, name="watchy_pcb_top")
 watchy_pcb_top = watchy.val().Center()
 
+# find the bottom of the PCB
 watchy = (watchy
     .faces("+Z", tag="watchy").faces("<<Z[-4]")
     .tag("watchy_pcb_bottom")
 )
 watchy_pcb_bb = watchy.val().BoundingBox()
-#debug(watchy, name="watchy_pcb_bottom")
 watchy_pcb_bottom = watchy.val().Center()
-
-# find a good "entire PCB face" by splitting the object in the middle of the PCB
-#watchy_pcb = (watchy
-#    .workplaneFromTagged("watchy_screen")
-#    .workplane(offset=-1.6)
-#    .split(keepBottom=True)
-#    .faces("-Z").faces("<<Z")
-#)
-#debug(watchy_pcb)
-
-show_object(watchy.solids(tag="watchy"), name='watchy')
 
 # battery stats
 def make_battery(type='10280', xOffset=0, yOffset=0, zOffset=0):
@@ -105,57 +117,56 @@ def make_battery(type='10280', xOffset=0, yOffset=0, zOffset=0):
         .tag(type)
     )
 
-# Strap Lugs
-# Originally from: github:giladaya/watchy-case-lugs (thanks!)
-p_strap_width = 22 + 0.5 # strap width inc. tolerance
-p_strap_dia = 4.0 # diameter of strap edge
-p_tbar_hole_r = 0.5 # Radius of t-bar pin
+def make_lugs():
+    # Strap Lugs
+    # Originally from: github:giladaya/watchy-case-lugs (thanks!)
+    p_strap_width = 22 + 0.5 # strap width inc. tolerance
+    p_strap_dia = 4.0 # diameter of strap edge
+    p_tbar_hole_r = 0.5 # Radius of t-bar pin
 
-# hack hack hack (these were computed originally, need to be altered for us)
-p_outerLength = 39
-p_outerHeight = 10
-p_inset_depth = 1
+    # hack hack hack (these were computed originally, need to be altered for us)
+    p_outerLength = 39
+    p_outerHeight = 10
+    p_inset_depth = 1
 
-tbar_hole_depth = 1.5
-lugs_th = 2.5
-lugs_width = p_strap_width + 2.0 * lugs_th
-lugs_dia = 5.0
-lugs_length = p_outerHeight / 2.0 - 1.0
+    tbar_hole_depth = 1.5
+    lugs_th = 2.5
+    lugs_width = p_strap_width + 2.0 * lugs_th
+    lugs_dia = 5.0
+    lugs_length = p_outerHeight / 2.0 - 1.0
 
-lugs = (cq.Workplane("ZY")
-  .workplane(
-    origin=(0, -p_outerLength / 2.0, p_outerHeight - p_inset_depth), 
-    offset=lugs_width / 2.0)
-  .line(-lugs_length, -lugs_length)
-  .tangentArcPoint((-lugs_dia, lugs_dia))
-  .line(lugs_length, lugs_length)
-  .close()
-  .extrude(-lugs_th)
-  .faces("<X")
-  .edges()
-  .fillet(lugs_th/2.0)
-  .faces(">X")
-  .workplane(
-    origin=(0, -p_outerLength / 2.0 - p_outerHeight * 0.25 + 0.5, p_outerHeight * 0.25 - p_inset_depth + 0.5), 
-    offset=(-tbar_hole_depth))
-  .circle(p_tbar_hole_r)
-  .cutBlind(tbar_hole_depth) 
-  #.extrude(p_strap_width + tbar_hole_depth * 2.0)
-  .mirror("ZY", union=True)
-  .mirror("XZ", union=True)
-)
-# rotate & translate giladaya's lugs to match our case orientation
-lugs = (lugs
-    .rotateAboutCenter((1,0,0), 180)
-    .rotateAboutCenter((0,0,1), 90)
-    .translate(watchy_screen_center)
-)
-lugs = (lugs
-    .translate((0,0,watchy_pcb_top.z - lugs.solids().val().BoundingBox().zmin))
-)
-#show_object(lugs, name='lugs')
+    lugs = (cq.Workplane("ZY")
+            .workplane(
+                origin=(0, -p_outerLength / 2.0, p_outerHeight - p_inset_depth), 
+                offset=lugs_width / 2.0)
+            .line(-lugs_length, -lugs_length)
+            .tangentArcPoint((-lugs_dia, lugs_dia))
+            .line(lugs_length, lugs_length)
+            .close()
+            .extrude(-lugs_th)
+            .faces("<X")
+            .edges()
+            .fillet(lugs_th/2.0)
+            .faces(">X")
+            .workplane(
+                origin=(0, -p_outerLength / 2.0 - p_outerHeight * 0.25 + 0.5, p_outerHeight * 0.25 - p_inset_depth + 0.5), 
+                offset=(-tbar_hole_depth))
+            .circle(p_tbar_hole_r)
+            .cutBlind(tbar_hole_depth) 
+            #.extrude(p_strap_width + tbar_hole_depth * 2.0)
+            .mirror("ZY", union=True)
+            .mirror("XZ", union=True)
+            # rotate & translate giladaya's lugs to match our case orientation
+            .rotateAboutCenter((1,0,0), 180)
+            .rotateAboutCenter((0,0,1), 90)
+    )
+    lugs_translate = watchy_screen_center + cq.Vector(
+        0, 0, watchy_pcb_top.z - lugs.solids().val().BoundingBox().zmin
+    )
+    return lugs.translate(lugs_translate)
 
 # magnetic connector
+mag_translate = None # will be computed below
 def make_mag(clearance=0, inner_clearance=None, extra=0):
     epsilon=.001 if clearance == 0 else 0
     if inner_clearance is None:
@@ -181,29 +192,89 @@ def make_mag(clearance=0, inner_clearance=None, extra=0):
     # zero is "the bottom edge" and "the outside face"
     return m.rotate((0,0,0), (1,0,0), -90).translate((0,0,-3.5))
 
-# watchy_pcb_bb: xlen=33.8 ylen=37.96
-case_wall_clear = 0.7
-case_wall_thick = 1.5
-case_depth = watchy_bb.zmax - watchy_pcb_top.z + case_wall_clear
-case = (cq.Workplane("XY")
+# pushbutton switch
+def make_sw(H=switch_height):
+    sw = (cq.Workplane("XY").tag("base")
+        .rect(3.35, 1).extrude(0.85)
+        .workplaneFromTagged("base")
+        .rect(2, 3.35).extrude(0.85)
+        .faces(">Z").edges(">X or <X or >Y or <Y")
+        .fillet((3.35-3.1)/2)
+        .workplaneFromTagged("base")
+        .pushPoints([(0,-1),(0,1)])
+        .rect(3.95, 0.38).extrude(.15)
+    )
+    body_bottom = (sw
+        .workplaneFromTagged("base")
+        .rect(3.1, 3.1).extrude(0.85, combine=False)
+        .edges("|Z").chamfer(0.2)
+    )
+    body_top = (sw
+        .workplaneFromTagged("base").workplane(offset=0.8)
+        .rect(3.1-0.4, 3.1-0.45).extrude(1.2 - 0.8, combine=False)
+        .faces(">Z").edges()
+        .fillet(0.35)
+    )
+    plunger = (sw
+        .workplaneFromTagged("base").workplane(offset=0.85)
+        .circle(1.8/2).extrude(H-0.85)
+    )
+    sw = sw.union(body_bottom).union(body_top).union(plunger)
+    # rotate to match watchy orientation
+    return (sw
+            .rotate((0,0,0), (1,0,0), 180)
+            .rotate((0,0,0), (0,0,1), 90)
+    )
+
+def make_sw_cutout(extra_depth=10, extra_length=3, H=switch_height):
+    sw = (cq.Workplane("XY").tag("base")
+          .workplane(offset=-extra_depth)
+          .rect(4+extra_length,4).extrude(extra_depth + 1.2)
+          .faces(">Z").workplane()
+          .circle(2/2).extrude(H-1.2 + extra_depth)
+    )
+    # rotate to match watchy orientation
+    return (sw
+            .rotate((0,0,0), (1,0,0), 180)
+            .rotate((0,0,0), (0,0,1), 90)
+    )
+    return sw
+
+def sw4_translate(obj, perp_distance=(switch_proud - switch_height), par_distance=5.5):
+    perp_distance += screw_inner_lug_radius
+    return (obj
+        .rotate((0,0,0),(0,0,1), mag_angle2)
+        .translate(watchy_screen_center +
+                   cq.Vector(0,
+                             -faceplate_center_shift,
+                             -watchy_screen_center.z
+                             + mag_translate.z - 3.5))
+        .translate((screw_separation_h/2, -screw_separation_w/2, 0))
+        .translate((cos(radians(-90 + mag_angle2))*perp_distance,
+                    sin(radians(-90 + mag_angle2))*perp_distance, 0))
+        .translate((cos(radians(-180 + mag_angle2))*par_distance,
+                    sin(radians(-180 + mag_angle2))*par_distance, 0))
+    )
+
+case1_depth = watchy_bb.zmax - watchy_pcb_top.z + case_wall_clear
+def make_case1():
+    return (cq.Workplane("XY")
     .workplane(offset=watchy_pcb_top.z,
                centerOption='ProjectedOrigin', origin=watchy_pcb_bb.center)
     .tag("case_bottom_top")
     .rect(watchy_pcb_bb.xlen + 2*case_wall_clear,
           watchy_pcb_bb.ylen + 2*case_wall_clear)
-    .extrude(case_depth, combine=False)
+    .extrude(case1_depth, combine=False)
     .faces("<<Z").shell(case_wall_thick)
     .union(lugs)
 #    .workplaneFromTagged("case_bottom_top")
 #    .rect(watchy_pcb_bb.xlen + 2*case_wall_clear,
 #          watchy_pcb_bb.ylen + 2*case_wall_clear)
 #    .cutBlind(watchy_bb.zmax - watchy_pcb_top.z + case_wall_clear)
-#    #.cut
-)
-#show_object(case, name='case')
+    )
 
-def make_switch_plate(obj):
-    return (obj
+def make_switch_plate(wp):
+    return (cq.Workplane("XY").copyWorkplane(wp)
     .line(-faceplate_height/2, -switch_plate_width/2 - switch_plate_offset)
     .line(-switch_plate_depth, switch_plate_offset)
     .line(0, switch_plate_width)
@@ -223,9 +294,10 @@ case2 = (cq.Workplane("XY")
     .faces("not(+Z or -Z)").edges("+Z or -Z")
     .fillet(screw_inner_lug_radius)
 )
+
 # extrude a bit for the magnetic connector
 # have to do some math here to make edges tangent with screw_inner_lug
-def make_mag_support():
+def make_mag_support(workplane):
     top_screw = cq.Vector(screw_separation_h/2, -screw_separation_w/2)
     bot_screw = top_screw + cq.Vector(-screw_separation_h, 0)
     top_point = top_screw + cq.Vector(
@@ -241,8 +313,7 @@ def make_mag_support():
     top_delta_x = top_delta_y / tan(radians(mag_angle2))
     bot_delta_y = (bot_point.y - target_y) # positive
     bot_delta_x = bot_delta_y * tan(radians(mag_angle1))
-    return (case2
-    .workplaneFromTagged("case2_bottom_top")
+    return (cq.Workplane("XY").copyWorkplane(workplane)
     .moveTo(top_screw.x, top_screw.y)
     .lineTo(top_point.x, top_point.y)
     .lineTo(top_point.x - top_delta_x, target_y)
@@ -252,12 +323,12 @@ def make_mag_support():
     .close()
     .extrude(case2_thick, combine=False)
     )
-mag_support = (make_mag_support()
+
+mag_support = (make_mag_support(case2.workplaneFromTagged("case2_bottom_top"))
     .faces("-Y and <<Y")
 )
-#debug(mag_support)
 # find center of the Y face
-mag_support_bb = mag_support.val().BoundingBox()
+#mag_support_bb = mag_support.val().BoundingBox()
 mag_support_center = mag_support.val().Center()
 mag_support= (mag_support
     .edges("+Z or -Z").fillet(2)
@@ -268,11 +339,17 @@ mag_translate = mag_support_center + cq.Vector(
     #(0,0,(case2_thick/2) - bottom_fillet + mag_depth_cheat)
     (0,0,-(case2_thick/2) + 3.5)
 )
-show_object(make_mag().translate(mag_translate), name='magnetic_latch')
-#debug(mag_support)
+
 case2 = (case2
     .union(mag_support)
 )
+
+# cutout for switch #4
+sw4_cutout = sw4_translate(make_sw_cutout()
+        .rotate((0,0,0),(0,0,1), 90)
+        .rotate((0,0,0),(1,0,0),-90)
+)
+
 # now add switch support
 case2_switch = (make_switch_plate(
     case2
@@ -281,30 +358,29 @@ case2_switch = (make_switch_plate(
     .extrude(case2_thick, combine=False)
     .faces("<X").edges("|Z").fillet(switch_plate_fillet)
 )
-#debug(case2_switch)
-#debug(case2.faces("<X").edges("|Z"));
 case2 = (case2
     .union(case2_switch)
     .tag("case2_body_prelim")
     .faces("<Z").tag("case2_split_face")
 )
+case2_top_thick = (
+    watchy_pcb_bottom.z - watchy_screen_center.z + screen_clearance
+)
 case2_top = (case2
     .workplaneFromTagged("case2_bottom_top")
     .faces(tag="case2_split_face").wires().toPending()
-    .extrude(-(watchy_pcb_bottom.z - watchy_screen_center.z + screen_clearance),
-             combine=False)
+    .extrude(-case2_top_thick, combine=False)
 )
-case2_mag_shield = (case2
-    .workplaneFromTagged("case2_bottom_top")
-    .workplane(centerOption='ProjectedOrigin', origin=mag_translate)
+case2_mag_shield = (cq.Workplane("XY")
+    .copyWorkplane(case2.workplaneFromTagged("case2_bottom_top"))
+    .workplane(centerOption='ProjectedOrigin', origin=mag_translate, invert=True)
     .center(0,-5)
-    .rect(23,10).extrude(4, combine=False) # should be 4.5
-    .faces("-Z").edges("|Y").fillet(3.5)
+    .rect(23,10).extrude(3.5, combine=False) # should be 4.5
+    .faces("-Z").edges("|Y").fillet(3.25)
 )
 #debug(case2_mag_shield)
 case2_top = (case2_top
-    #.union(case2_mag_shield) # XXX seems to hang?
-    #.union(make_mag(0.6).translate(mag_translate))
+    .union(case2_mag_shield)
     .workplaneFromTagged("case2_bottom_top")
     .workplane(centerOption='ProjectedOrigin', origin=watchy_pcb_bb.center)
     .rect(watchy_pcb_bb.xlen + 2*case_wall_clear,
@@ -316,6 +392,7 @@ case2 = (case2
     .faces("+Z", tag="case2_body_prelim").edges().fillet(bottom_fillet)
     .cut(make_mag(extra=10).translate(mag_translate))
     .cut(make_mag(extra=10).translate(mag_translate).shell(0.25))
+    .cut(sw4_cutout)
     .tag("case2_body")
     # cut out space for the PCB
     .workplaneFromTagged("case2_bottom_top")
@@ -333,13 +410,11 @@ case2 = (case2
     .rect(screw_separation_h,
           screw_separation_w, forConstruction=True)
     .vertices().circle(m2_tap_diam/2).cutThruAll()
-#    .rect(watchy_pcb_bb.xlen, watchy_pcb_bb.ylen, forConstruction=True)
-#    .vertices().circle(pcb_support_radius).cut()
-#    .solids(tag="case2_body").cut(
 )
 show_object(case2, name='case2')
 
-top_plate = (cq.Workplane("XY")
+def make_top_plate(case2_top):
+    top_plate = (cq.Workplane("XY")
     # create workplane, centered on the top plate
     # (which is offset from the screen)
     .workplane(offset=-(watchy_screen_center.z - screen_clearance),
@@ -356,21 +431,19 @@ top_plate = (cq.Workplane("XY")
     .rect(screw_separation_h, screw_separation_w, forConstruction=True)
     .vertices().circle(screw_lug_radius)
     .extrude(top_plate_thick)
-    # fillet the edges between screw bosses and body
-    # XXX we're going to do this below
-    #.faces("-X or +X or -Y or +Y").edges("+Z").fillet(0.75)
-)
-    # extrude switch plate.  A hull would be the easy way to do this,
-    # and loft works, but creates tiny faces
-top_plate = (make_switch_plate(
+    )
+    # extrude switch plate.
+    top_plate = top_plate.union(make_switch_plate(
     top_plate
     .workplaneFromTagged("top_plate")
     .center(0,-faceplate_center_shift))
     .tag("switch_plate")
     .extrude(top_plate_thick)
-    .faces("not(+Z or -Z)").edges("+Z or -Z").fillet(switch_plate_fillet)
-)
-top_plate = (top_plate
+    .faces("not(+Z or -Z)").edges("+Z or -Z")
+    .fillet(switch_plate_fillet)
+    )
+    # final bits
+    top_plate = (top_plate
     # cut out screen
     .workplaneFromTagged("top_plate")
     .center(0,-faceplate_center_shift)
@@ -378,15 +451,61 @@ top_plate = (top_plate
     # add to other other part of top case
     .union(case2_top)
     # cut out mag connector
-    .cut(make_mag(extra=5).translate(mag_translate))
-    .cut(make_mag(extra=5).translate(mag_translate).shell(0.25))
+    .cut(make_mag(extra=4).translate(mag_translate))
+    .cut(make_mag(extra=4).translate(mag_translate).shell(0.25))
+    .cut(sw4_cutout)
     # countersink the screw holes
     .workplaneFromTagged("top_plate")
     .faces(tag="top_plate_top").workplane(centerOption='ProjectedOrigin')
     .rect(screw_separation_h, screw_separation_w, forConstruction=True)
     .vertices()
     .cboreHole(m2_clear_diam, m2_head_clear_diam, m2_head_thick)
-)
-show_object(top_plate, name='top_plate')
+    # holes for gotchi switches
+    .workplaneFromTagged("top_plate")
+    .faces(tag="top_plate_top").workplane(
+        centerOption='ProjectedOrigin', origin=watchy_screen_center
+    )
+    .pushPoints(switch_positions)
+    .circle(2/2).cutThruAll()
+    # pcb clearance for gotchi switches
+    .faces("+Z and >Z").workplane(
+        centerOption='ProjectedOrigin', origin=watchy_screen_center,
+        invert=True
+    ).center(switch_positions[1][0] + extra_switch_pcb_gap/2, switch_positions[1][1])
+    .rect(switch_pcb_height + extra_switch_pcb_gap, switch_pcb_width)
+    .cutBlind(case2_top_thick + top_plate_thick - switch_plate_thick)
+    )
+    return top_plate
 
-show_object(make_battery('10280', xOffset=3, yOffset=50, zOffset=1), name='10280')
+if False:
+    show_object(make_lugs(), name='lugs')
+
+if True:
+    show_object(watchy.solids(tag="watchy"), name='watchy')
+
+if False:
+    show_object(make_case1(), name='case')
+
+if True:
+    show_object(make_top_plate(case2_top), name='top_plate')
+elif True:
+    show_object(case2_top, name='case2_top')
+
+if False:
+    show_object(make_mag().translate(mag_translate), name='magnetic_latch')
+
+if True:
+    show_object(make_battery('10280', xOffset=3, yOffset=53, zOffset=1), name='10280')
+
+if True:
+    cnt = 1
+    for pos in switch_positions:
+        show_object(make_sw().translate(watchy_screen_center).translate(pos),
+                    name = "Switch_"+str(cnt))
+        cnt += 1
+    sw4 = sw4_translate(make_sw()
+        .rotate((0,0,0),(0,0,1), 90)
+        .rotate((0,0,0),(1,0,0),-90),
+        switch_proud - switch_height
+    )
+    show_object(sw4, name='Switch_4')
