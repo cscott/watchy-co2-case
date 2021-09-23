@@ -7,6 +7,7 @@ watchy_board_width = 33.8
 
 # watchy_pcb_bb: xlen=33.8 ylen=37.96
 case_wall_clear = 0.7
+case_wall_bot_clear = 0.5
 case_wall_thick = 1.5
 
 top_plate_thick = 1.5
@@ -26,13 +27,23 @@ switch_plate_fillet = 0.75
 switch_spacing = 8.5
 switch_height = 2.5
 switch_proud = 0.5 # probably switch depress is actually 0.3?
-switch_cheat = 0.5 # adjust a little closer to watchy
-switch_pcb_thick = 0.8
-switch_pcb_width = 23
+switch_pcb_thick = 0.6
+switch_pcb_thick_clearance = 0.1 # pretty tight to support the switch
+switch_pcb_width = 23.5  # PCB is 5x22.5 (but centered as if it was 4x)
 switch_pcb_height = 4.5
 switch_plate_thick = 1
-switch_pcb_gap = (switch_pcb_thick + switch_height - switch_proud - switch_plate_thick)
-extra_switch_pcb_gap = 5
+# ensure we've got a decent wall at the front of the switch plate
+switch_front_wall = switch_plate_thick
+switch_cheat = (switch_plate_depth/2) - (switch_pcb_height)/2 + switch_front_wall
+#switch_pcb_gap = (switch_pcb_thick + switch_height - switch_proud - switch_plate_thick)
+extra_switch_pcb_gap = 1
+
+# relative to screen center (x offset was 2.75)
+pcb3_extra_width = 4
+pcb3_position = (-0.75, -screw_separation_w/2 - switch_pcb_height/2)
+pcb4_extra_width = 4
+pcb4_position = (-0.75, screw_separation_w/2 - switch_pcb_height/2 - faceplate_center_shift)
+
 
 screen_clearance = 0.5
 pcb_support_radius = 2
@@ -226,10 +237,13 @@ def make_sw(H=switch_height):
             .rotate((0,0,0), (0,0,1), 90)
     )
 
-def make_sw_cutout(extra_depth=10, extra_length=3, H=switch_height):
+def make_sw_cutout(extra_depth=10, extra_length=2.5, H=switch_height):
+    # pcb is 4x5, leave at least 0.5mm on all side (so 5x6); we're doing 4.75x7
+    cheat=0.25 # trim the top clearance
     sw = (cq.Workplane("XY").tag("base")
           .workplane(offset=-extra_depth)
-          .rect(4+extra_length,4).extrude(extra_depth + 1.2)
+          .center(0,-cheat/2)
+          .rect(4.5+extra_length,5-cheat).extrude(extra_depth + 1.2)
           .faces(">Z").workplane()
           .circle(2/2).extrude(H-1.2 + extra_depth)
     )
@@ -241,6 +255,11 @@ def make_sw_cutout(extra_depth=10, extra_length=3, H=switch_height):
     return sw
 
 def sw4_translate(obj, perp_distance=(switch_proud - switch_height), par_distance=5.5):
+    desired_wall_thick = 1
+    desired_pcb_clearance = 0.25
+    total_pcb_clear = 4 + 2*desired_pcb_clearance + 2*desired_wall_thick
+    case2_top_thick = 2.56346 # hack hack hack
+
     perp_distance += screw_inner_lug_radius
     return (obj
         .rotate((0,0,0),(0,0,1), mag_angle2)
@@ -254,6 +273,12 @@ def sw4_translate(obj, perp_distance=(switch_proud - switch_height), par_distanc
                     sin(radians(-90 + mag_angle2))*perp_distance, 0))
         .translate((cos(radians(-180 + mag_angle2))*par_distance,
                     sin(radians(-180 + mag_angle2))*par_distance, 0))
+        ## "as high as it could go"
+        .translate((0,0,(total_pcb_clear/2) - case2_top_thick))
+        ## centered between the top options
+        #.translate((0,0,(case2_thick + case2_top_thick)/2 - case2_top_thick))
+        ## "as low as it could go"
+        #.translate((0,0,case2_thick - (total_pcb_clear/2)))
     )
 
 case1_depth = watchy_bb.zmax - watchy_pcb_top.z + case_wall_clear
@@ -282,7 +307,7 @@ def make_switch_plate(wp):
     .close()
     )
 
-case2_thick = watchy_bb.zmax + case_wall_thick - watchy_pcb_bottom.z
+case2_thick = watchy_bb.zmax + case_wall_bot_clear + case_wall_thick - watchy_pcb_bottom.z
 case2 = (cq.Workplane("XY")
     .workplane(offset=watchy_pcb_bottom.z,
                centerOption='ProjectedOrigin',
@@ -344,8 +369,14 @@ case2 = (case2
     .union(mag_support)
 )
 
-# cutout for switch #4
+# cutout2 for switch #4
 sw4_cutout = sw4_translate(make_sw_cutout()
+        .rotate((0,0,0),(0,0,1), 90)
+        .rotate((0,0,0),(1,0,0),-90)
+)
+sw4_cutout_short = sw4_translate(
+    make_sw_cutout(extra_depth=switch_pcb_thick + switch_pcb_thick_clearance)
+    .union(make_sw_cutout(extra_length=-1))
         .rotate((0,0,0),(0,0,1), 90)
         .rotate((0,0,0),(1,0,0),-90)
 )
@@ -381,6 +412,15 @@ case2_mag_shield = (cq.Workplane("XY")
 #debug(case2_mag_shield)
 case2_top = (case2_top
     .union(case2_mag_shield)
+    # cut out space for auxilliary PCBs
+    .workplaneFromTagged("case2_bottom_top")
+    .workplane(centerOption='ProjectedOrigin', origin=watchy_screen_center)
+    .moveTo(pcb3_position[0], pcb3_position[1])
+    .rect(switch_pcb_width + pcb3_extra_width, switch_pcb_height)
+    .moveTo(pcb4_position[0], pcb4_position[1])
+    .rect(switch_pcb_width + pcb4_extra_width, switch_pcb_height)
+    .cutBlind(-(case2_top_thick - case_wall_thick))
+    # cut out space for the main PCB
     .workplaneFromTagged("case2_bottom_top")
     .workplane(centerOption='ProjectedOrigin', origin=watchy_pcb_bb.center)
     .rect(watchy_pcb_bb.xlen + 2*case_wall_clear,
@@ -393,14 +433,31 @@ case2 = (case2
     .cut(make_mag(extra=10).translate(mag_translate))
     .cut(make_mag(extra=10).translate(mag_translate).shell(0.25))
     .cut(sw4_cutout)
+    # boss to support the switches
+    .workplaneFromTagged("case2_bottom_top")
+    .workplane(centerOption='ProjectedOrigin', origin=watchy_screen_center)
+    .center(switch_positions[1][0], switch_positions[1][1])
+    .rect(switch_pcb_height, switch_pcb_width)
+         # shrink rectangle to provide a bit of clearance
+         .offset2D(-0.25)
+    .extrude((watchy_screen_center.z + switch_positions[1][2] + switch_pcb_thick + switch_pcb_thick_clearance)
+             - watchy_pcb_bottom.z)
+    # cut out space for auxilliary PCBs
+    .workplaneFromTagged("case2_bottom_top")
+    .workplane(centerOption='ProjectedOrigin', origin=watchy_screen_center)
+    .moveTo(pcb3_position[0], pcb3_position[1])
+    .rect(switch_pcb_width + pcb3_extra_width, switch_pcb_height)
+    .moveTo(pcb4_position[0], pcb4_position[1])
+    .rect(switch_pcb_width + pcb4_extra_width, switch_pcb_height)
+    .cutBlind(case2_thick - case_wall_thick)
     .tag("case2_body")
     # cut out space for the PCB
     .workplaneFromTagged("case2_bottom_top")
     .workplane(centerOption='ProjectedOrigin', origin=watchy_pcb_bb.center)
     .rect(watchy_pcb_bb.xlen + 2*case_wall_clear,
           watchy_pcb_bb.ylen + 2*case_wall_clear)
-    .extrude(watchy_bb.zmax - watchy_pcb_bottom.z + case_wall_clear,
-             combine=False).tag("pcb_cutout")
+    .extrude(watchy_bb.zmax - watchy_pcb_bottom.z + case_wall_bot_clear,
+             both=True, combine=False).tag("pcb_cutout")
     .edges("|Z", tag="pcb_cutout")
     .chamfer(case_wall_clear + 2.7).tag("pcb_cutout2")
 )
@@ -453,7 +510,7 @@ def make_top_plate(case2_top):
     # cut out mag connector
     .cut(make_mag(extra=4).translate(mag_translate))
     .cut(make_mag(extra=4).translate(mag_translate).shell(0.25))
-    .cut(sw4_cutout)
+    .cut(sw4_cutout_short)
     # countersink the screw holes
     .workplaneFromTagged("top_plate")
     .faces(tag="top_plate_top").workplane(centerOption='ProjectedOrigin')
@@ -491,7 +548,7 @@ if True:
 elif True:
     show_object(case2_top, name='case2_top')
 
-if False:
+if True:
     show_object(make_mag().translate(mag_translate), name='magnetic_latch')
 
 if True:
@@ -503,9 +560,42 @@ if True:
         show_object(make_sw().translate(watchy_screen_center).translate(pos),
                     name = "Switch_"+str(cnt))
         cnt += 1
+    # pcb for sw1-3
+    pcb1 = (cq.Workplane("XY").workplane(invert=True)
+            .center(0,-0.5).rect(22.5, 5).extrude(switch_pcb_thick)
+            # rotate to match watchy orientation
+            .rotate((0,0,0), (1,0,0), 180)
+            .rotate((0,0,0), (0,0,1), 90)
+    ).translate(watchy_screen_center).translate(switch_positions[1])
+    show_object(pcb1, name='Switch_PCB_1')
+
     sw4 = sw4_translate(make_sw()
         .rotate((0,0,0),(0,0,1), 90)
         .rotate((0,0,0),(1,0,0),-90),
         switch_proud - switch_height
     )
     show_object(sw4, name='Switch_4')
+    # pcb for sw4
+    pcb2 = (cq.Workplane("XY").workplane(invert=True)
+            .rect(5,4).extrude(switch_pcb_thick)
+            # rotate to match watchy orientation
+            .rotate((0,0,0), (1,0,0), 180)
+            .rotate((0,0,0), (0,0,1), 90)
+    )
+    pcb2 = sw4_translate(pcb2
+        .rotate((0,0,0),(0,0,1), 90)
+        .rotate((0,0,0),(1,0,0),-90)
+    )
+    show_object(pcb2, name='Switch_PCB_2')
+    # pcb3!
+    pcb3 = (cq.Workplane("XY")
+        .workplane(
+            # "2" here is the thickness of the speaker (if it's on the bottom)
+            offset=watchy_pcb_bottom.z + (case2_thick - case_wall_thick - 2),
+            centerOption='ProjectedOrigin',
+            origin=watchy_screen_center)
+            # "1" here is because the PCB is 5mm centered in a 4mm spot
+        .center(pcb3_position[0], pcb3_position[1] + 1)
+        .rect(22.5, 5).extrude(switch_pcb_thick)
+    )
+    show_object(pcb3, name='Speaker_PCB')
