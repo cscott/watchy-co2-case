@@ -1,7 +1,8 @@
 import cadquery as cq
 import numpy as np
-from math import atan2, degrees, radians, cos, sin, tan
+from math import atan2, degrees, radians, cos, sin, tan, sqrt
 from watchy_sizes import *
+from bat import make_battery_holder
 
 watchy_board_width = 33.8
 
@@ -128,52 +129,47 @@ def make_battery(type='10280', xOffset=0, yOffset=0, zOffset=0):
         .tag(type)
     )
 
-def make_lugs():
+# arguments to this function were computed originally, need to be altered
+# for this design.
+def make_lugs(p_outerLength=39, p_outerHeight=10, p_inset_depth=1, lugs_dia=5):
     # Strap Lugs
     # Originally from: github:giladaya/watchy-case-lugs (thanks!)
     p_strap_width = 22 + 0.5 # strap width inc. tolerance
     p_strap_dia = 4.0 # diameter of strap edge
     p_tbar_hole_r = 0.5 # Radius of t-bar pin
 
-    # hack hack hack (these were computed originally, need to be altered for us)
-    p_outerLength = 39
-    p_outerHeight = 10
-    p_inset_depth = 1
-
     tbar_hole_depth = 1.5
     lugs_th = 2.5
     lugs_width = p_strap_width + 2.0 * lugs_th
-    lugs_dia = 5.0
+    #lugs_dia = 5.0
     lugs_length = p_outerHeight / 2.0 - 1.0
 
     lugs = (cq.Workplane("ZY")
-            .workplane(
-                origin=(0, -p_outerLength / 2.0, p_outerHeight - p_inset_depth), 
-                offset=lugs_width / 2.0)
-            .line(-lugs_length, -lugs_length)
-            .tangentArcPoint((-lugs_dia, lugs_dia))
-            .line(lugs_length, lugs_length)
-            .close()
-            .extrude(-lugs_th)
-            .faces("<X")
-            .edges()
-            .fillet(lugs_th/2.0)
-            .faces(">X")
-            .workplane(
-                origin=(0, -p_outerLength / 2.0 - p_outerHeight * 0.25 + 0.5, p_outerHeight * 0.25 - p_inset_depth + 0.5), 
-                offset=(-tbar_hole_depth))
-            .circle(p_tbar_hole_r)
-            .cutBlind(tbar_hole_depth) 
-            #.extrude(p_strap_width + tbar_hole_depth * 2.0)
-            .mirror("ZY", union=True)
-            .mirror("XZ", union=True)
-            # rotate & translate giladaya's lugs to match our case orientation
-            .rotateAboutCenter((1,0,0), 180)
-            .rotateAboutCenter((0,0,1), 90)
+        .workplane(
+            origin=(0, -p_outerLength / 2.0, p_outerHeight - p_inset_depth), 
+            offset=lugs_width / 2.0)
+        .line(-lugs_length, -lugs_length)
+        .tangentArcPoint((-lugs_dia, lugs_dia))
+        .line(lugs_length, lugs_length)
+        .close()
+        .extrude(-lugs_th)
+        .faces("<X")
+        .edges()
+        .fillet(lugs_th/2.0)
+        .faces(">X")
+        .workplane(
+            origin=(0, -p_outerLength / 2.0 - p_outerHeight * 0.25 + 0.5, p_outerHeight * 0.25 - p_inset_depth + 0.5), 
+            offset=(-tbar_hole_depth))
+        .circle(p_tbar_hole_r)
+        .cutBlind(tbar_hole_depth) 
+        #.extrude(p_strap_width + tbar_hole_depth * 2.0)
+        .mirror("ZY", union=True)
+        .mirror("XZ", union=True)
+        # rotate & translate giladaya's lugs to match our case orientation
+        .rotate((0,0,0),(1,0,0), 180)
+        .rotate((0,0,0),(0,0,1), 90)
     )
-    lugs_translate = watchy_screen_center + cq.Vector(
-        0, 0, watchy_pcb_top.z - lugs.solids().val().BoundingBox().zmin
-    )
+    lugs_translate = (watchy_screen_center.x, watchy_screen_center.y, 0)
     return lugs.translate(lugs_translate)
 
 # magnetic connector
@@ -534,10 +530,27 @@ def make_top_plate(case2_top):
     )
     return top_plate
 
-if False:
-    show_object(make_lugs(), name='lugs')
-
 if True:
+    show_object(make_lugs(
+        # length
+        (screw_separation_h/2 + screw_inner_lug_radius) +
+        (faceplate_height/2 + switch_plate_depth),
+        # height
+        case2_thick,# + case2_top_thick + top_plate_thick,
+        # inset depth
+        0,
+        # lug diameter
+        3
+    ).translate((
+        # the switch plate makes our case not centered on watchy, so shift
+        ((screw_separation_h/2 + screw_inner_lug_radius) -
+         (faceplate_height/2 + switch_plate_depth))/2,
+        0,
+        # lugs zero is the bottom of the case, so make that match
+        watchy_pcb_bottom.z + case2_thick
+    )), name='lugs')
+
+if False:
     show_object(watchy.solids(tag="watchy"), name='watchy')
 
 if False:
@@ -548,13 +561,98 @@ if True:
 elif True:
     show_object(case2_top, name='case2_top')
 
-if True:
+if False:
     show_object(make_mag().translate(mag_translate), name='magnetic_latch')
 
 if True:
-    show_object(make_battery('10280', xOffset=3, yOffset=53, zOffset=1), name='10280')
+    #show_object(make_battery('10280', xOffset=3, yOffset=53, zOffset=1), name='10280')
+    battery_holder_radius = 6.55 + 0.6 # clip offset + pcb thickness
+    battery_holder_length = 37 # pcb length
+    battery_holder = (make_battery_holder()
+        # rotate to match watchy orientation
+        .rotate((0,0,0),(0,0,1),90)
+        # put center at the rotation axis of the battery
+        .translate((0,0,-battery_holder_radius))
+    )
+    # mock up some end caps (total length 37mm)
+    # adjust radius to make battery_holder_radius the flat-to-flat distance
+    cap_oct_radius = battery_holder_radius / cos(radians(45/2)) # about 7.7
+    cap_thick = 6.5
+    chamfer_amt = 0.5
+    cap_wall = 1
+    end_cap = (cq.Workplane("YZ")
+        .workplane(offset=battery_holder_length/2 - cap_thick)
+        .transformed(rotate=(0,0,360/16)).tag("bot")
+        .polygon(8, cap_oct_radius * 2)
+        .extrude(cap_thick + chamfer_amt)
+        .faces("+X").edges().chamfer(chamfer_amt)
+        .workplaneFromTagged("bot")
+        .polygon(8, (cap_oct_radius - cap_wall) * 2)
+        #.cutThruAll()
+        .cutBlind(cap_thick + chamfer_amt - cap_wall)
+    )
+    end_cap = end_cap.union(end_cap.mirror("YZ"))
+    # decorate it a bit
+    end_cap = (end_cap.faces("+X and >X").wires().toPending())
+    nominal_start_radius = (cap_oct_radius - chamfer_amt) * cos(radians(45/2))
+    start_angle = 45
+    cap_radius = nominal_start_radius / sin(radians(start_angle))
+    angle_increment = 9
+    last_z = cos(radians(start_angle))*cap_radius
+    for angle in range(start_angle-angle_increment, angle_increment, -angle_increment):
+        new_z = cos(radians(angle))*cap_radius
+        new_r = sin(radians(angle))*cap_radius
+        end_cap = end_cap.workplane(offset=new_z - last_z).circle(new_r)
+        last_z = new_z
+    end_cap = end_cap.loft(combine=True)
+    end_cap = (end_cap
+        # neck
+        .faces("-X and <X").workplane()
+        .circle(6.7/2).extrude(0.5)
+        # knurl
+        .faces("-X and <X").workplane()
+    )
+    knurl = (cq.Workplane("YZ").copyWorkplane(end_cap)
+        .circle(9.3/2).extrude(2.8)
+        .polygon(12, 9.3, forConstruction=True).vertices()
+        .circle(0.5).cutThruAll()
+    )
+    end_cap = (end_cap
+        .solids()
+        .union(knurl)
+        # second knurl (with diamonds)
+        .faces("-X and <X").workplane()
+    )
+    knurl2 = (cq.Workplane("YZ").copyWorkplane(end_cap)
+        .circle(6.8/2).extrude(0.8)
+        .copyWorkplane(end_cap)
+        .polygon(4, 6.8 - 1.4 + 2*.3, forConstruction=True).vertices()
+        .polygon(4, 1.4).extrude(1.1)
+    )
+    end_cap = (end_cap.solids().union(knurl2))
+    battery_holder = battery_holder.union(end_cap)
 
-if True:
+    base_pos = (case2.faces("+Y and >Y").val().Center()
+        + cq.Vector(0,battery_holder_radius,-0.8)
+    )
+    if False: # option 1 ("upside down")
+        pass
+    elif True: # option 2 ("in")
+        battery_holder = (battery_holder
+            .rotate((0,0,0),(1,0,0),90)
+        )
+    elif False: # option 3 ("out")
+        battery_holder = (battery_holder
+            .rotate((0,0,0),(1,0,0),-90)
+        )
+    else: # option 4 ("right side up")
+        battery_holder = (battery_holder
+            .rotate((0,0,0),(1,0,0),180)
+        )
+    battery_holder = battery_holder.translate(base_pos)
+    show_object(battery_holder, name='10280')
+
+if False:
     cnt = 1
     for pos in switch_positions:
         show_object(make_sw().translate(watchy_screen_center).translate(pos),

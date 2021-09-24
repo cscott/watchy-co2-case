@@ -26,9 +26,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="4.1250041"
-     inkscape:cx="399.36557"
-     inkscape:cy="820.11131"
+     inkscape:zoom="40.229006"
+     inkscape:cx="508.84799"
+     inkscape:cy="776.12046"
      inkscape:document-units="mm"
      inkscape:current-layer="g1240"
      showgrid="false"
@@ -26701,5 +26701,40 @@ h0Tvs5ViNXn8g6ZzUc0rULwL/wD6kX//2Q==
        height="1.7999998"
        x="98.547989"
        y="92.233856" />
+    <rect
+       style="opacity:0.5;fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:0.20000002;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1252"
+       width="6.7560701"
+       height="0.87668544"
+       x="130.48988"
+       y="88.629356" />
+    <rect
+       style="opacity:0.5;fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1254"
+       width="9.3445091"
+       height="3.8139718"
+       x="129.14819"
+       y="89.506042" />
+    <rect
+       style="opacity:0.5;fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:0.20000002;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1256"
+       width="6.7937016"
+       height="1.1891197"
+       x="130.33205"
+       y="93.320015" />
+    <rect
+       style="opacity:0.5;fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1258"
+       width="1.4074585"
+       height="0.26965332"
+       x="130.12456"
+       y="94.509491" />
+    <rect
+       style="opacity:0.5;fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect1260"
+       width="0.19073094"
+       height="0.19730788"
+       x="130.15085"
+       y="93.818916" />
   </g>
 </svg>
