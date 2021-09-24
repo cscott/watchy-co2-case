@@ -4,6 +4,23 @@ from math import atan2, degrees, radians, cos, sin, tan, sqrt
 from watchy_sizes import *
 from bat import make_battery_holder
 
+# To do:
+# 1. try harder to push mag connector down into the space below the watch
+#    A. Move part line lower, extend PCB fillets to hold PCB at same height
+#    B. SW4 and mag connector can share a centerline
+# 2. Redesign lugs from scratch to come out straight instead of at angle
+# 3. Make battery holder a separate component
+#    A. Cut out area where PCB is
+#    B. Add area above PCB where screws will affix
+#    C. Add holder bar on watch side (and cut that out of case)
+#    D. Squash bottom (and top?). Probably easiest to do this by making
+#       the basic cap a shell, then you can trim off some of the bottom
+#       before shelling
+# 4. Make top plate a separate part, investigate 3d printing/laser cutting
+#    A. If mag connector is moved down, top plate should be 1.0mm
+# 5. Undercut switch plate more; make it just thick enough to hold PCB
+#    (and likely entirely on top half part, not present on case bottom at all)
+
 watchy_board_width = 33.8
 
 # watchy_pcb_bb: xlen=33.8 ylen=37.96
@@ -24,7 +41,7 @@ faceplate_center_shift = 2.25
 switch_plate_width = 26
 switch_plate_depth = 5 # 4 on the model, but we need more room for switches
 switch_plate_offset = 1
-switch_plate_fillet = 0.75
+switch_plate_fillet = 0.75 # looks nice to match bottom_fillet
 switch_spacing = 8.5
 switch_height = 2.5
 switch_proud = 0.5 # probably switch depress is actually 0.3?
@@ -131,7 +148,7 @@ def make_battery(type='10280', xOffset=0, yOffset=0, zOffset=0):
 
 # arguments to this function were computed originally, need to be altered
 # for this design.
-def make_lugs(p_outerLength=39, p_outerHeight=10, p_inset_depth=1, lugs_dia=5):
+def make_lugs(p_outerLength=39, p_outerHeight=10, p_inset_depth=1, lugs_dia=5, lugs_th=2.5):
     # Strap Lugs
     # Originally from: github:giladaya/watchy-case-lugs (thanks!)
     p_strap_width = 22 + 0.5 # strap width inc. tolerance
@@ -139,7 +156,7 @@ def make_lugs(p_outerLength=39, p_outerHeight=10, p_inset_depth=1, lugs_dia=5):
     p_tbar_hole_r = 0.5 # Radius of t-bar pin
 
     tbar_hole_depth = 1.5
-    lugs_th = 2.5
+    #lugs_th = 2.5
     lugs_width = p_strap_width + 2.0 * lugs_th
     #lugs_dia = 5.0
     lugs_length = p_outerHeight / 2.0 - 1.0
@@ -153,8 +170,10 @@ def make_lugs(p_outerLength=39, p_outerHeight=10, p_inset_depth=1, lugs_dia=5):
         .line(lugs_length, lugs_length)
         .close()
         .extrude(-lugs_th)
+    )
+    lugs = (lugs
         .faces("<X")
-        .edges()
+        .edges("not(|(0,-1,1))")
         .fillet(lugs_th/2.0)
         .faces(">X")
         .workplane(
@@ -383,6 +402,8 @@ case2_switch = (make_switch_plate(
     .workplaneFromTagged("case2_bottom_top")
     .center(0,faceplate_center_shift))
     .extrude(case2_thick, combine=False)
+    .faces("+Z and >Z").edges("|Y").chamfer(case2_thick-bottom_fillet)
+    .faces("-X and <X").edges("|Y and >Z").fillet(bottom_fillet)
     .faces("<X").edges("|Z").fillet(switch_plate_fillet)
 )
 case2 = (case2
@@ -537,10 +558,12 @@ if True:
         (faceplate_height/2 + switch_plate_depth),
         # height
         case2_thick,# + case2_top_thick + top_plate_thick,
-        # inset depth
+        # inset depth (just pushes it down in Z)
         0,
         # lug diameter
-        3
+        3,
+        # lug thickness
+        2
     ).translate((
         # the switch plate makes our case not centered on watchy, so shift
         ((screw_separation_h/2 + screw_inner_lug_radius) -
@@ -625,10 +648,22 @@ if True:
     )
     knurl2 = (cq.Workplane("YZ").copyWorkplane(end_cap)
         .circle(6.8/2).extrude(0.8)
-        .copyWorkplane(end_cap)
-        .polygon(4, 6.8 - 1.4 + 2*.3, forConstruction=True).vertices()
-        .polygon(4, 1.4).extrude(1.1)
     )
+    knurl2_center = knurl2.faces("-X and <X").val().Center()
+    divot = (knurl2
+        .faces("-X and <X").workplane()
+        .circle(5.5/2).workplane(offset=-.4).circle(2.0/2)
+        .loft(combine=False)
+    )
+    knurl2 = knurl2.cut(divot)
+    poker = (cq.Workplane("YZ").copyWorkplane(end_cap)
+        .center(0, (6.8 - 1.4 + 2*.3)/2)
+        .rect(1, 1.4).extrude(1.1)
+    )
+    num_pokers = 3
+    for i in range(num_pokers):
+        knurl2 = knurl2.union(poker.rotate(knurl2_center, knurl2_center + cq.Vector(1,0,0), 360*i/num_pokers))
+
     end_cap = (end_cap.solids().union(knurl2))
     battery_holder = battery_holder.union(end_cap)
 
@@ -652,7 +687,7 @@ if True:
     battery_holder = battery_holder.translate(base_pos)
     show_object(battery_holder, name='10280')
 
-if False:
+if True:
     cnt = 1
     for pos in switch_positions:
         show_object(make_sw().translate(watchy_screen_center).translate(pos),
