@@ -9,4 +9,11 @@ in order to make space for the
 A matching PCB and installation instructions can be found at
 [cscott/watchy-co2-pcb](https://github.com/cscott/watchy-co2-pcb#readme).
 
+Pictured are the case fabricated in Aluminum 6061 (CNC machining by
+[pcbway.com](https://www.pcbway.com/rapid-prototyping/)) and
+Nylon PA12 (SLS printed and dyed black by
+[sculpteo](https://www.sculpteo.com/en/materials/sls-material/plastic-material/)).
+
+![CNC Aluminum](./photos/aluminum.jpg)
+![Nylon](./photos/nylon.jpg)
 ![Case render](./render.png)
